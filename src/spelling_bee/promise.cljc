@@ -1,6 +1,7 @@
 (ns spelling-bee.promise
-  (:refer-clojure :exclude [-> resolve let])
-  (:require [clojure.core :as cc]))
+  (:refer-clojure :exclude [as-> let resolve])
+  (:require [clojure.core :as cc]
+            [cljs.pprint :refer [pprint]]))
 
 (defmacro promise
   "
@@ -13,14 +14,14 @@
   `(js/Promise. (fn [~'resolve ~'reject] ~body)))
 
 
-(defmacro ->
+(defmacro as->
   "
   Example:
 
-  (promise-> (.resolve js/Promise {}) $
-             (assoc $ :a 1)
-             (assoc $ :b 2)
-             (println))
+  (as-> (.resolve js/Promise {}) $
+        (assoc $ :a 1)
+        (assoc $ :b 2)
+        (println))
   ;; => {:a 1 :b 2}
   ;; => #object[Promise [object Promise]]
   "
@@ -102,7 +103,61 @@
                      (->promise ~expr)
                      (fn [~name]
                        ~(recurse bindings body)))
-              (= (count body) 1) (first body)
-              :else `(-> (->promise ~(first body)) ~'$
-                         ~@(rest body))))]
+              (= (count body) 1) `(->promise ~(first body))
+              :else `(as-> (->promise ~(first body)) ~'$
+                       ~@(rest body))))]
     `(->promise ~(recurse bindings body))))
+
+(comment
+  (p/try
+    (.click page "Play")
+    (.click page ".sb-input")
+    (p/catch js/Error e
+      (println "oops" e))
+    (p/finally
+      (println "Done!")))
+  ;; Should transform into =>
+  (-> (.click page "Play")
+      (then (.click page ".sb-input"))
+      (catch [e]
+          (if (instance? js/Error e)
+            (println "oops" e)
+            ;; What should we do if the error is not a type we care about?
+            (reject e)))
+      (then (println "Done!"))))
+
+(defn catch-expr
+  [form]
+  (cc/let [[err-type argname & body] form]
+    `(.catch
+         (fn [~argname]
+           (if (instance? ~err-type ~argname)
+             (as-> (->promise ~(first body))
+                 ~@(rest body))
+             (reject ~argname))))))
+
+(defn finally-expr
+  [form]
+  `(then ~form))
+
+(defn chain-expr
+  [form]
+  `(then ~form))
+
+(defn promise-form
+  [form]
+  (cond
+    (and (seq? form) (= (first form) 'catch))
+    (catch-expr (rest form))
+
+    (and (seq? form) (= (first form) 'finally))
+    (chain-expr (second form))
+
+    :else
+    (chain-expr form)))
+
+(defmacro try
+  [& forms]
+  (cc/let [pforms (map promise-form (rest forms))]
+    `(-> (->promise ~(first forms))
+         ~@pforms)))

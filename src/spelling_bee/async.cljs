@@ -26,12 +26,12 @@
    (fn [res [name setup]]
      (println name res)
      (if name
-       (p/-> res resources
-                  (p/-> (setup resources) resource
-                             (assoc resources name resource)))
-       (p/-> res resources
-                  (setup resources)
-                  res)))
+       (p/as-> res resources
+         (p/as-> (setup resources) resource
+           (assoc resources name resource)))
+       (p/as-> res resources
+         (setup resources)
+         res)))
    (p/resolve init)
    (partition 2 resources)))
 
@@ -48,9 +48,9 @@
   (let [res-promise (p/resolve res)]
     (reduce
      (fn [chain task]
-       (p/-> res-promise res-map
-                  (task res-map)
-                  res-promise))
+       (p/as-> res-promise res-map
+         (task res-map)
+         res-promise))
      tasks)))
 
 
