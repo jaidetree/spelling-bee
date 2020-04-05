@@ -1,0 +1,14 @@
+{
+  "name": "spelling-bee",
+  "version": "1.0.0",
+  "description": "A dumb tool to automate solving a free web puzzle",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "highland": "^2.13.5",
+    "lumo-cljs": "^1.10.1",
+    "puppeteer": "^2.1.1"
+  }
+}
