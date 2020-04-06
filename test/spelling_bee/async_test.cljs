@@ -13,7 +13,7 @@
 
 (defn let-test
   []
-  (pprint (macroexpand
+  (pprint (macroexpand-1
            '(p/let [browser (.launch puppeteer)
                     pages (.pages browser)
                     page (nth pages 0)]
@@ -47,13 +47,12 @@
             (println "Timeout!"))
     (p/reject (js/Error. "Whoops"))
     (catch js/Error e
-      (println "Caught: " (.-message e)))
+      (println "Caught:" (.-message e)))
     (finally
       (println "Done!"))))
 
 
 (defn -main
   [& args]
-  #_(let-test)
-  #_(catch-test)
+  (let-test)
   (try-test))

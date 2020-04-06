@@ -1,5 +1,5 @@
 (ns spelling-bee.promise
-  (:refer-clojure :exclude [as-> let resolve])
+  (:refer-clojure :exclude [-> as-> let resolve])
   (:require [clojure.core :as cc]
             [cljs.pprint :refer [pprint]]))
 
@@ -95,54 +95,45 @@
   (conj results `(fn [~name]
                    ~expr)))
 
-(defmacro let
-  [bindings & body]
-  (letfn [(recurse [[name expr & bindings] body]
-            (cond
-              name `(.then
-                     (->promise ~expr)
-                     (fn [~name]
-                       ~(recurse bindings body)))
-              (= (count body) 1) `(->promise ~(first body))
-              :else `(as-> (->promise ~(first body)) ~'$
-                       ~@(rest body))))]
-    `(->promise ~(recurse bindings body))))
-
-(comment
-  (p/try
-    (.click page "Play")
-    (.click page ".sb-input")
-    (p/catch js/Error e
-      (println "oops" e))
-    (p/finally
-      (println "Done!")))
-  ;; Should transform into =>
-  (-> (.click page "Play")
-      (then (.click page ".sb-input"))
-      (catch [e]
-          (if (instance? js/Error e)
-            (println "oops" e)
-            ;; What should we do if the error is not a type we care about?
-            (reject e)))
-      (then (println "Done!"))))
-
 (defn catch-expr
   [form]
   (cc/let [[err-type argname & body] form]
     `(.catch
-         (fn [~argname]
-           (if (instance? ~err-type ~argname)
-             (as-> (->promise ~(first body))
-                 ~@(rest body))
-             (reject ~argname))))))
-
-(defn finally-expr
-  [form]
-  `(then ~form))
+      (fn [~argname]
+        (if (instance? ~err-type ~argname)
+          (as-> (->promise ~(first body))
+              ~@(rest body))
+          (reject ~argname))))))
 
 (defn chain-expr
   [form]
   `(then ~form))
+
+(defmacro ->
+  [form & forms]
+  `(cc/-> (->promise ~form)
+          ~@forms))
+
+(defn nest-vars
+  [[name expr & bindings] body]
+  (cond
+    name
+    `(.then
+      (->promise ~expr)
+      (fn [~name]
+        ~(nest-vars bindings body)))
+
+    (= (count body) 1)
+    `(->promise ~(first body))
+
+    :else
+    `(-> ~(first body)
+         ~@(map chain-expr (rest body)))))
+
+(defmacro let
+  [bindings & body]
+  `(->promise ~(nest-vars bindings body)))
+
 
 (defn promise-form
   [form]
@@ -157,7 +148,7 @@
     (chain-expr form)))
 
 (defmacro try
-  [& forms]
-  (cc/let [pforms (map promise-form (rest forms))]
-    `(-> (->promise ~(first forms))
+  [form & forms]
+  (cc/let [pforms (map promise-form forms)]
+    `(-> ~form
          ~@pforms)))
