@@ -1,5 +1,5 @@
 (ns spelling-bee.promise
-  (:refer-clojure :exclude [-> as-> let resolve])
+  (:refer-clojure :exclude [as-> do let resolve])
   (:require [clojure.core :as cc]
             [cljs.pprint :refer [pprint]]))
 
@@ -88,49 +88,66 @@
   [x]
   `(.reject js/Promise ~x))
 
-(defn chain-expr
+(defn- chain-expr
   [form]
   `(then ~form))
 
 
-(defmacro ->
+(defmacro do
+  "
+  Example:
+
+  (do
+    (timeout 3000)
+    (println \"Time is up!\"))
+  "
   [form & forms]
-  `(cc/-> (->promise ~form)
-          ~@forms))
+  `(-> (->promise ~form)
+       ~@forms))
 
 
-(defn nest-vars
+(defn- nest-promises
   [[name expr & bindings] body]
   (cond
     name
     `(then
       (->promise ~expr)
       [~name]
-      ~(nest-vars bindings body))
+      ~(nest-promises bindings body))
 
     (= (count body) 1)
     `(->promise ~(first body))
 
     :else
-    `(-> ~(first body)
-         ~@(map chain-expr (rest body)))))
+    `(spelling-bee.promise/do
+      ~(first body)
+      ~@(map chain-expr (rest body)))))
 
 (defmacro let
+  "
+  Example:
+
+  (let [browser (.launch puppeteer)
+        pages (.pages browser)
+        page (nth pages 0)]
+    (.goto page \"https://google.com\"))
+  "
   [bindings & body]
-  `(->promise ~(nest-vars bindings body)))
+  `(->promise ~(nest-promises bindings body)))
 
 
-(defn catch-expr
+(defn- catch-expr
   [form]
   (cc/let [[err-type argname & body] form]
     `(spelling-bee.promise/catch
          [~argname]
          (if (instance? ~err-type ~argname)
-           (as-> (->promise ~(first body))
-               ~@(rest body))
+           (do
+             ~(first body)
+             ~@(rest body))
            (reject ~argname)))))
 
-(defn promise-form
+(defn- promise-form
   [form]
   (cond
     (and (seq? form) (= (first form) 'catch))
@@ -143,7 +160,18 @@
     (chain-expr form)))
 
 (defmacro try
+  "
+  Example:
+
+  (try
+    (timeout 1000)
+    (println \"Time is up!)
+    (throw (js/Error. \"Oops\"))
+    (catch js/Error e)
+      (println \"Error:\" (.-message e)))
+  "
   [form & forms]
   (cc/let [pforms (map promise-form forms)]
-    `(-> ~form
-         ~@pforms)))
+    `(spelling-bee.promise/do
+      ~form
+      ~@pforms)))
