@@ -28,9 +28,7 @@
   [expr name & forms]
   `(cc/-> ~expr
           ~@(map (fn [form]
-                   `(.then
-                     (fn [~name]
-                       ~form))) forms)))
+                   `(then [~name] ~form)) forms)))
 
 (defmacro then
   "
@@ -90,38 +88,25 @@
   [x]
   `(.reject js/Promise ~x))
 
-(defn wrap-promise
-  [results [name expr]]
-  (conj results `(fn [~name]
-                   ~expr)))
-
-(defn catch-expr
-  [form]
-  (cc/let [[err-type argname & body] form]
-    `(.catch
-      (fn [~argname]
-        (if (instance? ~err-type ~argname)
-          (as-> (->promise ~(first body))
-              ~@(rest body))
-          (reject ~argname))))))
-
 (defn chain-expr
   [form]
   `(then ~form))
+
 
 (defmacro ->
   [form & forms]
   `(cc/-> (->promise ~form)
           ~@forms))
 
+
 (defn nest-vars
   [[name expr & bindings] body]
   (cond
     name
-    `(.then
+    `(then
       (->promise ~expr)
-      (fn [~name]
-        ~(nest-vars bindings body)))
+      [~name]
+      ~(nest-vars bindings body))
 
     (= (count body) 1)
     `(->promise ~(first body))
@@ -134,6 +119,16 @@
   [bindings & body]
   `(->promise ~(nest-vars bindings body)))
 
+
+(defn catch-expr
+  [form]
+  (cc/let [[err-type argname & body] form]
+    `(spelling-bee.promise/catch
+         [~argname]
+         (if (instance? ~err-type ~argname)
+           (as-> (->promise ~(first body))
+               ~@(rest body))
+           (reject ~argname)))))
 
 (defn promise-form
   [form]
