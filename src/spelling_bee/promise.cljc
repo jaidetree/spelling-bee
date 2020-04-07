@@ -1,5 +1,5 @@
 (ns spelling-bee.promise
-  (:refer-clojure :exclude [as-> do let resolve])
+  (:refer-clojure :exclude [as-> do doto let resolve])
   (:require [clojure.core :as cc]
             [cljs.pprint :refer [pprint]]))
 
@@ -26,7 +26,7 @@
   ;; => #object[Promise [object Promise]]
   "
   [expr name & forms]
-  `(cc/-> ~expr
+  `(cc/-> (->promise ~expr)
           ~@(map (fn [form]
                    `(then [~name] ~form)) forms)))
 
@@ -125,7 +125,7 @@
 
 (defmacro let
   "
-  Example:
+  Example:e
 
   (let [browser (.launch puppeteer)
         pages (.pages browser)
@@ -175,3 +175,31 @@
     `(spelling-bee.promise/do
       ~form
       ~@pforms)))
+
+(comment
+  (doto page
+    (open-puzzle)
+    (click-play))
+  (-> (->promise page)
+      (then [page]
+            (do
+              (open-puzzle page)
+              page))
+      (then [page]
+            (do
+              (click-play page)
+              page))))
+
+(defn tap-expr
+  [[head & rest]]
+  `(then
+    [x#]
+    (spelling-bee.promise/do
+      (~head x# ~@rest)
+      (then [] x#))))
+
+(defmacro doto
+  [init & forms]
+  (cc/let [pforms (map tap-expr forms)]
+    `(-> (->promise ~init)
+         ~@pforms)))

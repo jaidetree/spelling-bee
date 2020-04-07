@@ -51,8 +51,36 @@
     (finally
       (println "Done!"))))
 
+(defn do-test
+  []
+  (let [x :test]
+    (p/do (println "do test")
+          (p/then [] x))))
+
+(defn dummy-a
+  [a]
+  (println a)
+  nil)
+
+(defn dummy-b
+  [a b c]
+  (println {:a a :b b :c c})
+  nil)
+
+(defn doto-test
+  []
+  (pprint (macroexpand
+           '(p/doto :test
+              (dummy-a)
+              (dummy-b :b :c))))
+  (p/doto :test
+    (dummy-a)
+    (dummy-b :b :c)))
+
 
 (defn -main
   [& args]
-  (let-test)
-  (try-test))
+  #_(let-test)
+  #_(try-test)
+  #_(do-test)
+  (doto-test))

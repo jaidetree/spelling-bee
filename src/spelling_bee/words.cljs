@@ -1,4 +1,4 @@
-(ns spelling-bee.core
+(ns spelling-bee.words
   (:require
    [clojure.string :as s]
    ["fs" :as fs]
@@ -34,7 +34,7 @@
      (s/includes? word required-letter)
      (in-charset? word charset))))
 
-(defn find-words
+(defn search
   "
   Given a string of allowed characters returns a list of words read from a
   dictionary list that match our word-fits? predicate
@@ -50,10 +50,14 @@
                  (first charset)
                  charset))))
 
+(defn create-search
+  [{:keys [charset] :as state}]
+  (assoc state :search (search charset)))
+
 (defn -main
   [charset]
   (-> charset
-      (find-words)
+      (search)
       (.each println)))
 
 (comment

@@ -4,6 +4,7 @@
   "description": "A dumb tool to automate solving a free web puzzle",
   "main": "index.js",
   "scripts": {
+    "start": "npx lumo -c src -m spelling-bee.solve",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
